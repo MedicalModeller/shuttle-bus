@@ -233,6 +233,7 @@
   }
 
   function isDisplayActive(now) {
+    if (new URLSearchParams(window.location.search).has('preview')) return true;
     const t = currentTimeStr(now);
     const inHours = t >= CONFIG.DISPLAY_START && t <= CONFIG.DISPLAY_END;
     const dayOk = CONFIG.DISPLAY_DAYS.includes(now.getDay());
