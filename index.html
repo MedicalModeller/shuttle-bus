@@ -82,9 +82,16 @@
     border-radius: 8px;
     padding: 28px 30px;
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto auto 1fr auto;
     align-items: center;
-    gap: 24px;
+    gap: 20px;
+  }
+
+  .ride-index {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 34px;
+    font-weight: 700;
+    color: var(--yellow);
   }
 
   .ride-time {
@@ -176,7 +183,8 @@
   @media (max-width: 480px) {
     .clock { font-size: 32px; }
     .ride-time, .seats-number { font-size: 30px; }
-    .ride-row { grid-template-columns: auto 1fr auto; padding: 18px; gap: 12px; }
+    .ride-index { font-size: 24px; }
+    .ride-row { grid-template-columns: auto auto 1fr auto; padding: 18px; gap: 12px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -332,13 +340,14 @@
       return;
     }
 
-    rides.forEach(r => {
+    rides.forEach((r, i) => {
       const row = document.createElement('div');
       row.className = 'ride-row';
       const seatsClass = (r.seats !== null && r.seats <= CONFIG.LOW_SEATS_THRESHOLD) ? 'low' : 'plenty';
       const seatsText = r.seats !== null ? r.seats : '—';
 
       row.innerHTML = `
+        <div class="ride-index">[${i + 1}]</div>
         <div class="ride-time">${formatTime(r.pickupDate)}</div>
         <div class="ride-meta">
           <div class="ride-name">Ride: ${formatDotTime(r.departureAt)} - ${formatDotTime(r.arrivalAt)}</div>
