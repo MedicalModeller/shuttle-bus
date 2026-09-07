@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chaplin Drive — Trent Park Shuttle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #121815;
+    --bg-raised: #1a2320;
+    --amber: #F2A93C;
+    --off-white: #EDEAE0;
+    --sage: #7A9186;
+    --sage-dim: #4E5F58;
+    --warn: #C4453D;
+    --rule: #2A342F;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--off-white);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    line-height: 1.4;
+  }
+
+  .board {
+    width: 100%;
+    max-width: 640px;
+  }
+
+  .board-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 20px;
+    margin-bottom: 28px;
+  }
+
+  .stop-name {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--sage);
+  }
+
+  .stop-name span {
+    display: block;
+    font-size: 11px;
+    color: var(--sage-dim);
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .clock {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 34px;
+    font-weight: 500;
+    color: var(--amber);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rides {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .ride-row {
+    background: var(--bg-raised);
+    border-radius: 6px;
+    padding: 22px 24px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .ride-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 30px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ride-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .ride-name {
+    font-size: 14px;
+    color: var(--off-white);
+  }
+
+  .ride-countdown {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--sage);
+  }
+
+  .seats {
+    text-align: right;
+  }
+
+  .seats-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 34px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .seats-label {
+    font-size: 11px;
+    color: var(--sage-dim);
+    margin-top: 4px;
+    letter-spacing: 0.01em;
+  }
+
+  .seats-number.plenty { color: var(--off-white); }
+  .seats-number.low { color: var(--warn); }
+
+  .empty-state, .error-state {
+    background: var(--bg-raised);
+    border-radius: 6px;
+    padding: 32px 24px;
+    text-align: center;
+    color: var(--sage);
+    font-size: 14px;
+  }
+
+  .error-state { color: var(--warn); }
+
+  .closed-state {
+    background: var(--bg-raised);
+    border-radius: 6px;
+    padding: 32px 24px;
+    text-align: center;
+    color: var(--sage);
+    font-size: 14px;
+  }
+
+  .closed-state strong {
+    display: block;
+    color: var(--off-white);
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+
+  .updated {
+    margin-top: 24px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--sage-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  @media (max-width: 480px) {
+    .clock { font-size: 26px; }
+    .ride-time, .seats-number { font-size: 24px; }
+    .ride-row { grid-template-columns: auto 1fr auto; padding: 18px; gap: 12px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="board">
+  <div class="board-header">
+    <div class="stop-name">Chaplin Drive<span>Trent Park Shuttle — to Snakes Lane Depot</span></div>
+    <div class="clock" id="clock">--:--:--</div>
+  </div>
+
+  <div class="rides" id="rides">
+    <div class="empty-state">Loading next departures…</div>
+  </div>
+
+  <div class="updated" id="updated"></div>
+</div>
+
+<script>
+  const CONFIG = {
+    BASE_URL: 'https://core-api.maas.flockmobility.com/api/private/v1/open',
+    SHUTTLE_GROUP_CODE: '4K9X8M2P7R',
+    CORP_CODE: 'BERKELEY',
+    PICKUP_STOP_ID: 'ca95a666-bb21-48f0-96a2-c7f1143978cd',   // Chaplin Drive
+    DROPOFF_STOP_ID: 'c4f3f6c3-03c3-408f-ad15-0daff52f9891',  // Snakes Lane Depot
+    NUM_RIDES_TO_SHOW: 2,
+    BOOKING_CUTOFF_MS: 7 * 60 * 1000,
+    REFRESH_DATA_MS: 60 * 1000,   // re-fetch timetable/seats every 60s
+    LOW_SEATS_THRESHOLD: 3,
+    OPERATING_START: '06:50',     // shuttle service window (small buffer before 06:56)
+    OPERATING_END: '20:20',       // shuttle service window (small buffer after 20:10)
+    DISPLAY_START: '09:30',       // when the reception display should be active
+    DISPLAY_END: '17:30',
+    DISPLAY_DAYS: [2, 3, 4, 5, 6, 0], // Tue–Sun (0=Sun, 1=Mon, 2=Tue... — Monday excluded)
+    DAILY_RELOAD_TIME: '03:00'    // quiet-hours full reload, once per day
+  };
+
+  let reloadedToday = false;
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    checkDailyReload(now);
+  }
+
+  function currentTimeStr(now) {
+    return `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  }
+
+  function isWithinOperatingHours(now) {
+    const t = currentTimeStr(now);
+    return t >= CONFIG.OPERATING_START && t <= CONFIG.OPERATING_END;
+  }
+
+  function isDisplayActive(now) {
+    const t = currentTimeStr(now);
+    const inHours = t >= CONFIG.DISPLAY_START && t <= CONFIG.DISPLAY_END;
+    const dayOk = CONFIG.DISPLAY_DAYS.includes(now.getDay());
+    return inHours && dayOk;
+  }
+
+  // Full page reload once a day during quiet hours, so a kiosk tab left
+  // open for weeks doesn't slowly accumulate memory/DOM cruft.
+  function checkDailyReload(now) {
+    const t = currentTimeStr(now);
+    if (t === CONFIG.DAILY_RELOAD_TIME) {
+      if (!reloadedToday) {
+        reloadedToday = true;
+        location.reload();
+      }
+    } else {
+      reloadedToday = false;
+    }
+  }
+
+  // Keep the screen awake while this tab is visible, where supported.
+  let wakeLock = null;
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+      }
+    } catch (e) { /* not supported or denied — safe to ignore */ }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') requestWakeLock();
+  });
+
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  async function postJson(url, payload) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json.outcome !== 'success') throw new Error('API returned an error');
+    return json;
+  }
+
+  async function fetchTimetable(rideDate) {
+    const url = `${CONFIG.BASE_URL}/shuttle-groups/${CONFIG.SHUTTLE_GROUP_CODE}/list?corpCode=${CONFIG.CORP_CODE}`;
+    const res = await postJson(url, { rideDate });
+    return res.responseContent.openRides;
+  }
+
+  async function fetchSeats(openRideId, pickupAt) {
+    const url = `${CONFIG.BASE_URL}/shuttles/${openRideId}/seat-availability?corpCode=${CONFIG.CORP_CODE}`;
+    const res = await postJson(url, {
+      pickupAt,
+      pickupStopPlaceId: CONFIG.PICKUP_STOP_ID,
+      dropoffStopPlaceId: CONFIG.DROPOFF_STOP_ID
+    });
+    const info = res.responseContent.stopAvailabilityInfoList[0];
+    return info ? info.outboundAvailableSeats : null;
+  }
+
+  function formatCountdown(msUntil) {
+    const mins = Math.floor(msUntil / 60000);
+    if (mins < 1) return 'due now';
+    if (mins === 1) return 'in 1 min';
+    return `in ${mins} min`;
+  }
+
+  function formatTime(date) {
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function renderRides(rides) {
+    const container = document.getElementById('rides');
+    container.innerHTML = '';
+
+    if (rides.length === 0) {
+      container.innerHTML = '<div class="empty-state">No more bookable departures today.</div>';
+      return;
+    }
+
+    rides.forEach(r => {
+      const row = document.createElement('div');
+      row.className = 'ride-row';
+      const seatsClass = (r.seats !== null && r.seats <= CONFIG.LOW_SEATS_THRESHOLD) ? 'low' : 'plenty';
+      const seatsText = r.seats !== null ? r.seats : '—';
+
+      row.innerHTML = `
+        <div class="ride-time">${formatTime(r.pickupDate)}</div>
+        <div class="ride-meta">
+          <div class="ride-name">${r.name}</div>
+          <div class="ride-countdown">${formatCountdown(r.pickupDate - new Date())}</div>
+        </div>
+        <div class="seats">
+          <div class="seats-number ${seatsClass}">${seatsText}</div>
+          <div class="seats-label">seats free</div>
+        </div>
+      `;
+      container.appendChild(row);
+    });
+  }
+
+  async function refreshData() {
+    const container = document.getElementById('rides');
+    const now = new Date();
+
+    if (!isDisplayActive(now)) {
+      container.innerHTML = `
+        <div class="closed-state">
+          <strong>Display paused</strong>
+          Active Tuesday–Sunday, 09:30–17:30.
+        </div>`;
+      document.getElementById('updated').textContent = '';
+      return;
+    }
+
+    if (!isWithinOperatingHours(now)) {
+      container.innerHTML = `
+        <div class="closed-state">
+          <strong>Service closed</strong>
+          Shuttle runs 06:56–20:10. Next departures will appear here from 06:56.
+        </div>`;
+      document.getElementById('updated').textContent = '';
+      return;
+    }
+
+    try {
+      const dateStr = todayStr();
+      const openRides = await fetchTimetable(dateStr);
+
+      const upcoming = openRides
+        .map(ride => {
+          const stop = ride.stops.find(s => s.placeId === CONFIG.PICKUP_STOP_ID);
+          const hasDropoff = ride.stops.some(s => s.placeId === CONFIG.DROPOFF_STOP_ID);
+          if (!stop || !hasDropoff) return null;
+
+          const pickupAt = `${dateStr}T${stop.vehicleArrivesAt}:00`;
+          const pickupDate = new Date(pickupAt);
+          if (pickupDate.getTime() - now.getTime() < CONFIG.BOOKING_CUTOFF_MS) return null;
+
+          return { ride, pickupAt, pickupDate };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.pickupDate - b.pickupDate)
+        .slice(0, CONFIG.NUM_RIDES_TO_SHOW);
+
+      const withSeats = await Promise.all(upcoming.map(async u => {
+        let seats = null;
+        try {
+          seats = await fetchSeats(u.ride.openRideId, u.pickupAt);
+        } catch (e) { /* leave as null, shown as — */ }
+        return { name: u.ride.name, pickupDate: u.pickupDate, seats };
+      }));
+
+      renderRides(withSeats);
+      document.getElementById('updated').textContent =
+        `Updated ${formatTime(new Date())}:${pad(new Date().getSeconds())}`;
+
+    } catch (e) {
+      container.innerHTML = `<div class="error-state">Couldn't reach the shuttle service. Retrying shortly…</div>`;
+    }
+  }
+
+  updateClock();
+  setInterval(updateClock, 1000);
+  refreshData();
+  setInterval(refreshData, CONFIG.REFRESH_DATA_MS);
+  requestWakeLock();
+</script>
+
+</body>
+</html>
