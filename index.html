@@ -180,6 +180,34 @@
     font-family: 'JetBrains Mono', monospace;
   }
 
+  .tube-status {
+    margin-top: 18px;
+    background: var(--bg-raised);
+    border-radius: 8px;
+    padding: 16px 22px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .tube-roundel {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .tube-roundel.good { background: #2E7D32; }
+  .tube-roundel.minor { background: #E8890C; }
+  .tube-roundel.severe { background: var(--warn); }
+  .tube-roundel.unknown { background: var(--sage-dim); }
+
+  .tube-text {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--off-white);
+  }
+
   @media (max-width: 480px) {
     .clock { font-size: 32px; }
     .ride-time, .seats-number { font-size: 30px; }
@@ -205,6 +233,11 @@
   </div>
 
   <div class="updated" id="updated"></div>
+
+  <div class="tube-status" id="tubeStatus">
+    <div class="tube-roundel unknown"></div>
+    <div class="tube-text">Piccadilly Line — checking status…</div>
+  </div>
 </div>
 
 <script>
@@ -223,7 +256,9 @@
     DISPLAY_START: '09:30',       // when the reception display should be active
     DISPLAY_END: '17:30',
     DISPLAY_DAYS: [2, 3, 4, 5, 6, 0], // Tue–Sun (0=Sun, 1=Mon, 2=Tue... — Monday excluded)
-    DAILY_RELOAD_TIME: '03:00'    // quiet-hours full reload, once per day
+    DAILY_RELOAD_TIME: '03:00',   // quiet-hours full reload, once per day
+    TFL_LINE_ID: 'piccadilly',
+    TFL_REFRESH_MS: 5 * 60 * 1000 // TfL status doesn't need 60s polling — every 5 min is plenty
   };
 
   let reloadedToday = false;
@@ -429,10 +464,47 @@
     }
   }
 
+  async function refreshTubeStatus() {
+    const el = document.getElementById('tubeStatus');
+    try {
+      const res = await fetch(`https://api.tfl.gov.uk/Line/${CONFIG.TFL_LINE_ID}/Status`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      const line = data[0];
+      const statuses = (line && line.lineStatuses) ? line.lineStatuses : [];
+      const worst = statuses.reduce((a, b) => (b.severity < a.severity ? b : a), statuses[0]);
+
+      const description = worst ? worst.statusSeverityDescription : 'Good Service';
+      const isGood = !worst || description === 'Good Service';
+
+      let roundelClass = 'good';
+      if (!isGood) {
+        // TfL severity: lower number = worse disruption. Treat anything
+        // very severe (closures, suspensions) distinctly from minor delays.
+        roundelClass = (worst.severity <= 5) ? 'severe' : 'minor';
+      }
+
+      const label = isGood ? 'Piccadilly Line — Good Service' : `Piccadilly Line — ${description}`;
+
+      el.innerHTML = `
+        <div class="tube-roundel ${roundelClass}"></div>
+        <div class="tube-text">${label}</div>
+      `;
+    } catch (e) {
+      el.innerHTML = `
+        <div class="tube-roundel unknown"></div>
+        <div class="tube-text">Piccadilly Line — status unavailable</div>
+      `;
+    }
+  }
+
   updateClock();
   setInterval(updateClock, 1000);
   refreshData();
   setInterval(refreshData, CONFIG.REFRESH_DATA_MS);
+  refreshTubeStatus();
+  setInterval(refreshTubeStatus, CONFIG.TFL_REFRESH_MS);
   requestWakeLock();
 </script>
 
