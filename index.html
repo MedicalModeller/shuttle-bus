@@ -186,7 +186,7 @@
     border-radius: 8px;
     padding: 16px 22px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 14px;
   }
 
@@ -195,6 +195,7 @@
     height: 14px;
     border-radius: 50%;
     flex-shrink: 0;
+    margin-top: 4px;
   }
 
   .tube-roundel.good { background: #2E7D32; }
@@ -203,9 +204,10 @@
   .tube-roundel.unknown { background: var(--sage-dim); }
 
   .tube-text {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 500;
     color: var(--off-white);
+    line-height: 1.5;
   }
 
   @media (max-width: 480px) {
@@ -485,7 +487,12 @@
         roundelClass = (worst.severity <= 5) ? 'severe' : 'minor';
       }
 
-      const label = isGood ? 'Piccadilly Line — Good Service' : `Piccadilly Line — ${description}`;
+      // Use TfL's full explanatory message (reason) when there is one —
+      // only "Good Service" has no reason attached, since there's
+      // nothing to explain.
+      const label = isGood
+        ? 'Piccadilly Line — Good Service'
+        : `Piccadilly Line — ${worst.reason || description}`;
 
       el.innerHTML = `
         <div class="tube-roundel ${roundelClass}"></div>
